@@ -41,6 +41,31 @@ input[type='date']::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body,
+  #root {
+    background: #ffffff !important;
+  }
+
+  .print-area,
+  .print-area * {
+    color: #0f172a !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+
+  .print-area {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
 @layer components {
   .card {
     @apply bg-card border border-border/60 rounded-2xl shadow-lg shadow-black/20;

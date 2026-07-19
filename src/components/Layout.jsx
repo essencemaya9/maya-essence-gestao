@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Receipt, Users, RefreshCw, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Receipt, Users, RefreshCw, Sparkles, Megaphone, FileText, Radar } from 'lucide-react'
 import { useRecompraBadge } from '../context/RecompraContext'
 
 const NAV_ITEMS = [
@@ -7,6 +7,9 @@ const NAV_ITEMS = [
   { to: '/lancamentos', label: 'Lançamentos', icon: Receipt },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/recompra', label: 'Recompra', icon: RefreshCw, badge: true },
+  { to: '/anuncios', label: 'Anúncios', icon: Megaphone },
+  { to: '/relatorio', label: 'Relatório', icon: FileText },
+  { to: '/performance', label: 'Performance', icon: Radar },
 ]
 
 export default function Layout() {
@@ -66,14 +69,14 @@ export default function Layout() {
         </main>
       </div>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border/60 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border/60 flex items-stretch overflow-x-auto pb-[env(safe-area-inset-bottom)]">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-1 py-2.5 relative text-[11px] font-medium transition-colors ${
+              `flex flex-col items-center justify-center gap-1 py-2.5 px-3 min-w-[68px] shrink-0 relative text-[11px] font-medium transition-colors ${
                 isActive ? 'text-primary-light' : 'text-slate-500'
               }`
             }
