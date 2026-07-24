@@ -127,13 +127,49 @@ export default function Lancamentos() {
   async function confirmDelete() {
     if (!deleteTarget) return
     setDeleting(true)
+
+    const { data: movimentacoes, error: movError } = await supabase
+      .from('movimentacoes_estoque')
+      .select('id, produto_id, tipo, quantidade, produtos(quantidade_atual)')
+      .eq('transacao_id', deleteTarget.id)
+
+    if (movError) {
+      setDeleting(false)
+      toast.error('Erro ao verificar movimentações de estoque: ' + movError.message)
+      return
+    }
+
+    for (const mov of movimentacoes || []) {
+      if (mov.tipo === 'saida' || mov.tipo === 'entrada') {
+        const atual = Number(mov.produtos?.quantidade_atual ?? 0)
+        const delta = mov.tipo === 'saida' ? mov.quantidade : -mov.quantidade
+        const { error: stockError } = await supabase
+          .from('produtos')
+          .update({ quantidade_atual: atual + Number(delta) })
+          .eq('id', mov.produto_id)
+        if (stockError) {
+          setDeleting(false)
+          toast.error('Erro ao devolver a quantidade ao estoque: ' + stockError.message)
+          return
+        }
+      }
+      const { error: delMovError } = await supabase.from('movimentacoes_estoque').delete().eq('id', mov.id)
+      if (delMovError) {
+        setDeleting(false)
+        toast.error('Erro ao remover movimentação de estoque: ' + delMovError.message)
+        return
+      }
+    }
+
     const { error } = await supabase.from('transacoes').delete().eq('id', deleteTarget.id)
     setDeleting(false)
     if (error) {
       toast.error('Erro ao excluir: ' + error.message)
       return
     }
-    toast.success('Lançamento excluído.')
+    toast.success(
+      movimentacoes && movimentacoes.length > 0 ? 'Lançamento excluído e estoque devolvido.' : 'Lançamento excluído.',
+    )
     setDeleteTarget(null)
     refresh()
   }
