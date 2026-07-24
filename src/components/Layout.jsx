@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Receipt, Users, RefreshCw, Sparkles, Megaphone, FileText, Radar } from 'lucide-react'
+import { LayoutDashboard, Receipt, Users, RefreshCw, Sparkles, Megaphone, FileText, Radar, Boxes } from 'lucide-react'
 import { useRecompraBadge } from '../context/RecompraContext'
 
 const NAV_ITEMS = [
@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/lancamentos', label: 'Lançamentos', icon: Receipt },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/recompra', label: 'Recompra', icon: RefreshCw, badge: true },
+  { to: '/estoque', label: 'Estoque', icon: Boxes },
   { to: '/anuncios', label: 'Anúncios', icon: Megaphone },
   { to: '/relatorio', label: 'Relatório', icon: FileText },
   { to: '/performance', label: 'Performance', icon: Radar },

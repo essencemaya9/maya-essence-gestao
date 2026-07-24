@@ -13,6 +13,8 @@ const emptyForm = {
   categoria_id: null,
   cliente_id: null,
   data: todayISO(),
+  produto_id: null,
+  quantidadeVendida: '',
 }
 
 export default function TransactionModal({ open, onClose, onSaved, editingTransaction }) {
@@ -20,17 +22,20 @@ export default function TransactionModal({ open, onClose, onSaved, editingTransa
   const [form, setForm] = useState(emptyForm)
   const [categorias, setCategorias] = useState([])
   const [clientes, setClientes] = useState([])
+  const [produtos, setProdutos] = useState([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
     async function loadOptions() {
-      const [{ data: cats }, { data: clis }] = await Promise.all([
+      const [{ data: cats }, { data: clis }, { data: prods }] = await Promise.all([
         supabase.from('categorias').select('id, nome, tipo').order('nome'),
         supabase.from('clientes').select('id, nome').order('nome'),
+        supabase.from('produtos').select('id, nome, quantidade_atual, unidade').eq('ativo', true).order('nome'),
       ])
       setCategorias(cats || [])
       setClientes(clis || [])
+      setProdutos(prods || [])
     }
     loadOptions()
   }, [open])
@@ -45,6 +50,8 @@ export default function TransactionModal({ open, onClose, onSaved, editingTransa
         categoria_id: editingTransaction.categoria_id || null,
         cliente_id: editingTransaction.cliente_id || null,
         data: editingTransaction.data || todayISO(),
+        produto_id: null,
+        quantidadeVendida: '',
       })
     } else {
       setForm(emptyForm)
@@ -59,6 +66,9 @@ export default function TransactionModal({ open, onClose, onSaved, editingTransa
     setForm((f) => ({ ...f, valorDigits: digits }))
   }
 
+  const produtoSelecionado = produtos.find((p) => p.id === form.produto_id)
+  const quantidadeVendida = Number(form.quantidadeVendida) || 0
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (valorNumerico <= 0) {
@@ -67,6 +77,14 @@ export default function TransactionModal({ open, onClose, onSaved, editingTransa
     }
     if (!form.data) {
       toast.error('Informe a data.')
+      return
+    }
+    if (form.produto_id && quantidadeVendida <= 0) {
+      toast.error('Informe a quantidade vendida do produto.')
+      return
+    }
+    if (produtoSelecionado && quantidadeVendida > Number(produtoSelecionado.quantidade_atual)) {
+      toast.error(`Estoque insuficiente: restam apenas ${produtoSelecionado.quantidade_atual} ${produtoSelecionado.unidade}.`)
       return
     }
 
@@ -81,18 +99,44 @@ export default function TransactionModal({ open, onClose, onSaved, editingTransa
     }
 
     let error
+    let novaTransacaoId = null
     if (editingTransaction) {
       ;({ error } = await supabase.from('transacoes').update(payload).eq('id', editingTransaction.id))
     } else {
-      ;({ error } = await supabase.from('transacoes').insert(payload))
+      const { data: inserted, error: insertError } = await supabase.from('transacoes').insert(payload).select('id').single()
+      error = insertError
+      novaTransacaoId = inserted?.id || null
     }
-    setSaving(false)
 
     if (error) {
+      setSaving(false)
       toast.error('Erro ao salvar lançamento: ' + error.message)
       return
     }
 
+    if (!editingTransaction && form.produto_id && quantidadeVendida > 0) {
+      const { error: movError } = await supabase.from('movimentacoes_estoque').insert({
+        produto_id: form.produto_id,
+        tipo: 'saida',
+        quantidade: quantidadeVendida,
+        motivo: 'Venda registrada em Lançamentos',
+        transacao_id: novaTransacaoId,
+        data: form.data,
+      })
+      if (movError) {
+        toast.error('Lançamento salvo, mas houve erro ao baixar o estoque: ' + movError.message)
+      } else {
+        const { error: stockError } = await supabase
+          .from('produtos')
+          .update({ quantidade_atual: Number(produtoSelecionado.quantidade_atual) - quantidadeVendida })
+          .eq('id', form.produto_id)
+        if (stockError) {
+          toast.error('Movimentação registrada, mas houve erro ao atualizar o estoque: ' + stockError.message)
+        }
+      }
+    }
+
+    setSaving(false)
     toast.success(editingTransaction ? 'Lançamento atualizado!' : 'Lançamento adicionado!')
     onSaved?.()
     onClose()
@@ -169,6 +213,32 @@ export default function TransactionModal({ open, onClose, onSaved, editingTransa
             placeholder="Selecionar cliente"
           />
         </div>
+
+        {form.tipo === 'entrada' && !editingTransaction && produtos.length > 0 && (
+          <div className="grid grid-cols-[1fr_auto] gap-3">
+            <div>
+              <label className="label-field">Produto vendido (opcional)</label>
+              <SearchableSelect
+                options={produtos.map((p) => ({ value: p.id, label: `${p.nome} (${p.quantidade_atual} ${p.unidade})` }))}
+                value={form.produto_id}
+                onChange={(v) => setForm((f) => ({ ...f, produto_id: v, quantidadeVendida: v ? f.quantidadeVendida : '' }))}
+                placeholder="Baixar do estoque"
+              />
+            </div>
+            {form.produto_id && (
+              <div className="w-24">
+                <label className="label-field">Qtd.</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="input-field"
+                  value={form.quantidadeVendida}
+                  onChange={(e) => setForm((f) => ({ ...f, quantidadeVendida: e.target.value }))}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="label-field">Data</label>

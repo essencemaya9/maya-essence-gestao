@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Lancamentos from './pages/Lancamentos'
 import Clientes from './pages/Clientes'
 import Recompra from './pages/Recompra'
+import Estoque from './pages/Estoque'
 import Anuncios from './pages/Anuncios'
 import Relatorio from './pages/Relatorio'
 import Performance from './pages/Performance'
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="lancamentos" element={<Lancamentos />} />
             <Route path="clientes" element={<Clientes />} />
             <Route path="recompra" element={<Recompra />} />
+            <Route path="estoque" element={<Estoque />} />
             <Route path="anuncios" element={<Anuncios />} />
             <Route path="relatorio" element={<Relatorio />} />
             <Route path="performance" element={<Performance />} />
