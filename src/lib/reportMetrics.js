@@ -151,15 +151,54 @@ export function computeProductAnalysis(transacoesMes) {
   return { topEssencias, categoriaLider, categoriaMaiorTicket }
 }
 
+export async function computeEstoqueAnalysis(range) {
+  const [{ data: produtos, error: produtosError }, { data: movimentacoes, error: movError }] = await Promise.all([
+    supabase.from('produtos').select('id, nome, quantidade_atual, quantidade_minima, unidade, preco_custo').eq('ativo', true),
+    supabase
+      .from('movimentacoes_estoque')
+      .select('produto_id, quantidade, tipo, produtos(nome, unidade)')
+      .eq('tipo', 'saida')
+      .gte('data', range.start)
+      .lte('data', range.end),
+  ])
+
+  // Tabelas de estoque ainda não configuradas — seção fica de fora do relatório sem quebrar o resto.
+  if (produtosError || movError) return null
+
+  const lista = produtos || []
+  const totalProdutos = lista.length
+  const emFalta = lista.filter((p) => Number(p.quantidade_atual) <= 0)
+  const estoqueBaixo = lista.filter((p) => Number(p.quantidade_atual) > 0 && Number(p.quantidade_atual) <= Number(p.quantidade_minima))
+  const valorEstoque = lista.reduce((s, p) => s + Number(p.quantidade_atual) * Number(p.preco_custo || 0), 0)
+
+  const vendidoPorProduto = new Map()
+  ;(movimentacoes || []).forEach((m) => {
+    const atual = vendidoPorProduto.get(m.produto_id) || { nome: m.produtos?.nome || 'Produto removido', unidade: m.produtos?.unidade, quantidade: 0 }
+    atual.quantidade += Number(m.quantidade)
+    vendidoPorProduto.set(m.produto_id, atual)
+  })
+
+  const maisVendidos = Array.from(vendidoPorProduto.entries())
+    .map(([produtoId, dados]) => ({ produtoId, ...dados }))
+    .sort((a, b) => b.quantidade - a.quantidade)
+    .slice(0, 5)
+
+  const idsComVenda = new Set(vendidoPorProduto.keys())
+  const parados = lista.filter((p) => Number(p.quantidade_atual) > 0 && !idsComVenda.has(p.id)).slice(0, 5)
+
+  return { totalProdutos, emFalta, estoqueBaixo, valorEstoque, maisVendidos, parados }
+}
+
 export async function loadMonthlyReport(monthValue) {
   const range = getMonthRange(monthValue)
   const prevMonthValue = previousMonthValue(monthValue)
   const prevRange = getMonthRange(prevMonthValue)
 
-  const [transacoesMes, transacoesMesAnterior, { data: clientesAll, error: clientesError }] = await Promise.all([
+  const [transacoesMes, transacoesMesAnterior, { data: clientesAll, error: clientesError }, estoqueAnalise] = await Promise.all([
     fetchTransacoesRange(range.start, range.end),
     fetchTransacoesRange(prevRange.start, prevRange.end),
     supabase.from('clientes').select('id, nome, created_at, data_ultima_compra'),
+    computeEstoqueAnalysis(range),
   ])
 
   if (clientesError) throw clientesError
@@ -177,6 +216,7 @@ export async function loadMonthlyReport(monthValue) {
     crescimentoEntradas: percentChange(financeiroMes.totalEntradas, financeiroMesAnterior.totalEntradas),
     clientesAnalise,
     produtosAnalise,
+    estoqueAnalise,
   }
 }
 
